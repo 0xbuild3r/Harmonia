@@ -69,14 +69,16 @@ contract MockLido {
     }
 
     function getPooledEthByShares(uint256 _share) external view returns (uint256) {
-        uint total = getTotalPooledEther();
-        return stETHToken.totalSupply() * total / _share;
+        //uint total = getTotalPooledEther();
+        uint balance = address(this).balance;
+        //uint a = stETHToken.totalSupply();
+        //console.log("lido.getPooledEthByShares",balance, _share, a);
+        return _share * stETHToken.totalSupply() / balance ;
     }
     
     // Function to transfer ETH for finalized withdrawals
     function transferETH(address _to, uint256 _amount) external {
         require(address(this).balance >= _amount, "Insufficient ETH in contract");
-        console.log("eth transfer", _to);
         (bool success, ) = _to.call{value: _amount}("");
         require(success, "ETH transfer failed");
     }

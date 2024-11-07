@@ -22,9 +22,7 @@ interface IWithdrawalQueue {
     function transferFrom(address from, address to, uint256 tokenId) external;
 }
 
-
 // Router contract
-
 
 contract Router is AccessControl, ReentrancyGuard {
     // Roles
@@ -56,8 +54,8 @@ contract Router is AccessControl, ReentrancyGuard {
     event AdminFeeUpdated(uint256 newFee);
     event AdminFeeCollected(uint256 feeAmountShares);
     event AdminFeesWithdrawn(uint256 feeAmountETH);
-    event Deposit(address indexed user, uint256 amountETH);
-    event WithdrawalRequested(address indexed user, uint256 amountETH, uint256 requestId);
+    event Deposit(uint256 amountETH);
+    event WithdrawalRequested(uint256 amountETH, uint256 requestId);
     event WithdrawalClaimed(address indexed user, uint256 amountETH, uint256 requestId);
 
     constructor(address _lidoContract, address _withdrawalQueue, address _routerManager) {
@@ -88,7 +86,7 @@ contract Router is AccessControl, ReentrancyGuard {
     }
 
     // Deposit ETH to Lido and handle admin fee
-    function deposit() external payable nonReentrant {
+    function deposit() external payable returns (uint256) {
         require(msg.value > 0, "Must deposit ETH");
 
         // Collect admin fee from yield before deposit
@@ -103,7 +101,7 @@ contract Router is AccessControl, ReentrancyGuard {
         }
 
         // Deposit ETH into Lido
-        lido.submit{value: msg.value}(address(0));
+        uint256 stETHAmount = lido.submit{value: msg.value}(address(0));
 
         // Record new stETH balance after deposit
         uint256 newTotalShares = stETH.balanceOf(address(this));
@@ -114,13 +112,18 @@ contract Router is AccessControl, ReentrancyGuard {
         // Update lastStETHBalance to new balance
         lastStETHBalance = newTotalShares;
 
-        emit Deposit(msg.sender, msg.value);
+        emit Deposit(msg.value);
+        return stETHAmount;
+    }
+
+    // Confirm if witdrawal request is ready to finalize
+    function isWithdrawalFinalized(uint256 _requestId) external view returns(bool) {
+        return withdrawalQueue.isWithdrawalFinalized(_requestId);
     }
 
     // Request withdrawal from Lido
-    function requestWithdrawal(address _user, uint256 _amountStETH) external nonReentrant onlyRouterManager returns (uint256) {
+    function requestWithdrawal(uint256 _amountStETH) external nonReentrant onlyRouterManager returns (uint256) {
         require(_amountStETH > 0, "Amount must be greater than zero");
-        require(_user != address(0), "Invalid user address");
 
         // Collect admin fee from yield before withdrawal
         uint256 currentStETHBalance = stETH.balanceOf(address(this));
@@ -146,7 +149,7 @@ contract Router is AccessControl, ReentrancyGuard {
         // Update totalStETHBalance after fee collection
         totalStETHBalance = stETH.balanceOf(address(this));
 
-        emit WithdrawalRequested(_user, _amountStETH, requestIds[0]);
+        emit WithdrawalRequested(_amountStETH, requestIds[0]);
 
         return requestIds[0];
     }
@@ -187,7 +190,12 @@ contract Router is AccessControl, ReentrancyGuard {
 
     // Function to get total ETH deposited (excluding admin fees)
     function getTotalDepositedETH() external view returns (uint256) {
-        return lido.getPooledEthByShares(getStETHBalance());
+        uint256 stETHBalance = getStETHBalance();
+        if(stETHBalance > 0){
+            return lido.getPooledEthByShares(getStETHBalance());
+        } else {
+            return 0;
+        }
     }
 
     // Function to get stETH balance (excluding admin fees)

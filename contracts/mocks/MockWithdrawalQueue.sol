@@ -60,7 +60,6 @@ contract MockWithdrawalQueue {
 
         requestIds = new uint256[](1);
         requestIds[0] = requestId;
-
         emit RequestWithdraw(_recipient, _sharesAmount[0], requestId);
     }
 
@@ -69,7 +68,6 @@ contract MockWithdrawalQueue {
         WithdrawalRequest storage request = withdrawalRequests[_requestId];
         require(request.requester != address(0), "Invalid requestId");
         require(!request.finalized, "Already finalized");
-        console.log("finalizing", _requestId);
         request.finalized = true;
     }
 
@@ -113,7 +111,6 @@ contract MockWithdrawalQueue {
         // Calculate the ETH amount corresponding to the shares
         amountETH = request.shares;
         require(address(lido).balance >= amountETH, "Insufficient ETH in Lido contract");
-        console.log("eth withdraw requester", request.requester);
         // Transfer ETH to the requester
         (bool success, ) = address(lido).call(abi.encodeWithSignature("transferETH(address,uint256)", msg.sender, amountETH));
         require(success, "ETH transfer failed");
